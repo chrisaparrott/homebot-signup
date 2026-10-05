@@ -51,9 +51,7 @@ h1 { margin: 22px 0 0; font-size: clamp(38px, 6vw, 60px); line-height: 1.12; fon
 h1 mark { color: var(--cobalt); background: linear-gradient(var(--yellow), var(--yellow)) no-repeat 0 58% / 100% 78%; padding: 0 0.14em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .lead { margin: 16px 0 0; max-width: 34ch; font-size: 18px; line-height: 1.55; font-weight: 500; color: var(--tint); }
 .signup-card { background: var(--white); color: var(--ink); border-radius: 24px; padding: 22px; box-shadow: 0 18px 40px rgba(16, 21, 74, 0.28); }
-.signup-card .eyebrow { margin: 0 0 12px; font-size: 13px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
-#homebot_homeowner { min-height: 160px; }
-.signup-card .note { margin: 12px 0 0; font-size: 13px; line-height: 1.5; color: var(--muted); }
+#homebot_homeowner { min-height: 118px; }
 
 /* Sections */
 section { padding-block: 44px 8px; }
@@ -98,19 +96,36 @@ footer a:hover { color: var(--yellow); }
 <div><strong>Chris Parrott</strong><span>Loan Officer · NMLS #2307631</span></div>
 </div>
 <h1>What’s your home worth <mark>right now?</mark></h1>
-<p class="lead">Get a free report on your home’s value and equity, delivered to your inbox every month.</p>
+<p class="lead">Get the free report delivered to your inbox every month.</p>
 </div>
 <div class="signup-card" id="signup">
-<p class="eyebrow">Your free home report</p>
 <div id="homebot_homeowner"></div>
 <script> (function (h,b) { var w = window, d = document, s = 'script', x, y; w['__hb_namespace'] = h; w[h] = w[h] || function () { (w[h].q=w[h].q||[]).push(arguments) }; y = d.createElement(s); x = d.getElementsByTagName(s)[0]; y.async = 1; y.src = b; x.parentNode.insertBefore(y,x) })('Homebot','https://embed.homebotapp.com/lgw/v1/widget.js'); Homebot('#homebot_homeowner', '366d8c106ba275ddc89b93c70e889b7f1272a5a7d9065e66') </script>
 <script>
 // Homebot's box draws inside its own shadow root, which the page's CSS can't reach.
 // Once it appears, give it one extra stylesheet so its text, including the address
-// suggestions, uses the same Poppins type as the rest of the page.
+// suggestions, uses the same Poppins type as the rest of the page, its own
+// "What's your home worth?" heading is hidden, and the button fits "Sign me up".
 (function () {
-  var css = '*{font-family:"Poppins","Segoe UI",system-ui,sans-serif !important}';
+  var css = '*{font-family:"Poppins","Segoe UI",system-ui,sans-serif !important}' +
+    '.__hblgw--heading-container{display:none !important}' +
+    'button.__hblgw--button-container{width:96px !important;font-size:13px !important;text-transform:none !important;white-space:nowrap}' +
+    '#hb-lgw-combobox{padding-right:109px !important}';
   var host = document.getElementById('homebot_homeowner');
+  // Chris's wording: the button says "Sign me up" and the box asks for the home address
+  // (people were typing their email into it). Only the idle labels are swapped, so
+  // Homebot's own in-progress messages still show; put back if the box re-renders.
+  function relabel(root) {
+    var button = root.querySelector('button[type="submit"]');
+    if (button) {
+      var walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+      for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (node.nodeValue.trim() === 'Check') node.nodeValue = 'Sign me up';
+      }
+    }
+    var input = root.querySelector('#hb-lgw-combobox');
+    if (input && input.getAttribute('placeholder') === 'Enter an address') input.setAttribute('placeholder', 'Home address');
+  }
   function addStyle(root) {
     try {
       var sheet = new CSSStyleSheet();
@@ -126,12 +141,17 @@ footer a:hover { color: var(--yellow); }
   }
   var tries = 0;
   (function wait() {
-    if (host.shadowRoot) return addStyle(host.shadowRoot);
+    var root = host.shadowRoot;
+    if (root) {
+      addStyle(root);
+      relabel(root);
+      new MutationObserver(function () { relabel(root); }).observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['placeholder'] });
+      return;
+    }
     if (++tries < 600) setTimeout(wait, 100);
   })();
 })();
 </script>
-<p class="note">Once you sign up, a Home Digest email with your home’s numbers arrives every month.</p>
 </div>
 </div>
 </header>
