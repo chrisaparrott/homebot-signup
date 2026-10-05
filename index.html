@@ -51,7 +51,8 @@ h1 { margin: 22px 0 0; font-size: clamp(38px, 6vw, 60px); line-height: 1.12; fon
 h1 mark { color: var(--cobalt); background: linear-gradient(var(--yellow), var(--yellow)) no-repeat 0 58% / 100% 78%; padding: 0 0.14em; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .lead { margin: 16px 0 0; max-width: 34ch; font-size: 18px; line-height: 1.55; font-weight: 500; color: var(--tint); }
 .signup-card { background: var(--white); color: var(--ink); border-radius: 24px; padding: 22px; box-shadow: 0 18px 40px rgba(16, 21, 74, 0.28); }
-#homebot_homeowner { min-height: 118px; }
+#homebot_homeowner { min-height: 155px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 /* Sections */
 section { padding-block: 44px 8px; }
@@ -100,31 +101,53 @@ footer a:hover { color: var(--yellow); }
 </div>
 <div class="signup-card" id="signup">
 <div id="homebot_homeowner"></div>
+<p class="sr-only" id="address-hint" aria-live="polite"></p>
 <script> (function (h,b) { var w = window, d = document, s = 'script', x, y; w['__hb_namespace'] = h; w[h] = w[h] || function () { (w[h].q=w[h].q||[]).push(arguments) }; y = d.createElement(s); x = d.getElementsByTagName(s)[0]; y.async = 1; y.src = b; x.parentNode.insertBefore(y,x) })('Homebot','https://embed.homebotapp.com/lgw/v1/widget.js'); Homebot('#homebot_homeowner', '366d8c106ba275ddc89b93c70e889b7f1272a5a7d9065e66') </script>
 <script>
 // Homebot's box draws inside its own shadow root, which the page's CSS can't reach.
 // Once it appears, give it one extra stylesheet so its text, including the address
-// suggestions, uses the same Poppins type as the rest of the page, its own
-// "What's your home worth?" heading is hidden, and the button fits "Sign me up".
+// suggestions, uses the same Poppins type as the rest of the page, its heading reads
+// "ENTER YOUR ADDRESS" in the heading type, and the button fits "Sign me up".
 (function () {
   var css = '*{font-family:"Poppins","Segoe UI",system-ui,sans-serif !important}' +
-    '.__hblgw--heading-container{display:none !important}' +
+    '.__hblgw--heading-container,.__hblgw--heading-container *{font-size:20px !important;line-height:1.25 !important;font-weight:800 !important;letter-spacing:0.02em !important;text-transform:uppercase !important;color:#10154a !important}' +
     'button.__hblgw--button-container{width:96px !important;font-size:13px !important;text-transform:none !important;white-space:nowrap}' +
-    '#hb-lgw-combobox{padding-right:109px !important}';
+    '#hb-lgw-combobox{padding-right:109px !important}' +
+    // An email typed into the address box turns it red with a short note under it.
+    ':host([data-email-error]) form.__hblgw--input-container{border-color:#d92d20 !important;box-shadow:0 0 0 1px #d92d20 !important}' +
+    ':host([data-email-error]) #hb-lgw-combobox{background-color:#fef3f2 !important}' +
+    ':host([data-email-error]) .__hblgw--logo-message::before{content:"Enter your home address above.";display:block;margin:0 0 8px;font-size:14px;line-height:1.4;font-weight:600;color:#b42318;text-align:left}';
   var host = document.getElementById('homebot_homeowner');
-  // Chris's wording: the button says "Sign me up" and the box asks for the home address
-  // (people were typing their email into it). Only the idle labels are swapped, so
-  // Homebot's own in-progress messages still show; put back if the box re-renders.
-  function relabel(root) {
-    var button = root.querySelector('button[type="submit"]');
-    if (button) {
-      var walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
-      for (var node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (node.nodeValue.trim() === 'Check') node.nodeValue = 'Sign me up';
-      }
+  var hint = document.getElementById('address-hint');
+  // Chris's wording: the heading says "Enter your address", the button "Sign me up", and
+  // the box asks for a "Home address" (people were typing their email into it). Only the
+  // idle labels are swapped, so Homebot's own in-progress messages still show; put back
+  // if the box re-renders.
+  function swapText(el, from, to) {
+    if (!el) return;
+    var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for (var node = walker.nextNode(); node; node = walker.nextNode()) {
+      if (node.nodeValue.replace(/’/g, "'").trim() === from) node.nodeValue = to;
     }
+  }
+  function relabel(root) {
+    swapText(root.querySelector('.__hblgw--heading-container'), "What's your home worth?", 'Enter your address');
+    swapText(root.querySelector('button[type="submit"]'), 'Check', 'Sign me up');
     var input = root.querySelector('#hb-lgw-combobox');
     if (input && input.getAttribute('placeholder') === 'Enter an address') input.setAttribute('placeholder', 'Home address');
+  }
+  function setEmailError(on) {
+    if (on) host.setAttribute('data-email-error', ''); else host.removeAttribute('data-email-error');
+    hint.textContent = on ? 'Enter your home address above.' : '';
+  }
+  function watchForEmail(root) {
+    root.addEventListener('input', function (e) {
+      if (e.target && e.target.id === 'hb-lgw-combobox') setEmailError(e.target.value.indexOf('@') !== -1);
+    }, true);
+    root.addEventListener('submit', function (e) {
+      var input = root.querySelector('#hb-lgw-combobox');
+      if (input && input.value.indexOf('@') !== -1) { setEmailError(true); e.preventDefault(); e.stopPropagation(); }
+    }, true);
   }
   function addStyle(root) {
     try {
@@ -145,6 +168,7 @@ footer a:hover { color: var(--yellow); }
     if (root) {
       addStyle(root);
       relabel(root);
+      watchForEmail(root);
       new MutationObserver(function () { relabel(root); }).observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['placeholder'] });
       return;
     }
